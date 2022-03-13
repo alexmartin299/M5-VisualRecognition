@@ -10,7 +10,7 @@
  https://www.overleaf.com/read/mchsbsqjhrcs  
  
  **Presentations**:  
-   Week1:   https://docs.google.com/presentation/d/1DFNzOIEmj35EVuI-A0nPaJrHFI6k4Ut7Nl-Dig2nJ_s/edit?usp=sharing
+   Week1:   https://docs.google.com/presentation/d/1DFNzOIEmj35EVuI-A0nPaJrHFI6k4Ut7Nl-Dig2nJ_s/edit?usp=sharing  
    Week2:  
    Week3:  
    Week4:  
