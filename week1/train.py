@@ -5,6 +5,7 @@ import torch.nn as nn
 import wandb
 import torchvision
 import torchvision.transforms as transforms
+from tqdm import tqdm
 
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -12,7 +13,7 @@ print('Using:', device)
 
 
 epochs = 200
-BATCH_SIZE = 4
+BATCH_SIZE = 8
 lr = 1e-3
 
 wandb.init(project="M5-VisualRecognition", entity="m5-group6")
@@ -69,7 +70,7 @@ def Train(model,train_dataloader):
     size = len(train_dataloader.dataset)
     model.train()
     loss_metric, correct = 0, 0
-    for batch in train_dataloader:
+    for batch in tqdm(train_dataloader,desc='Training',leave=True):
         minput = batch[0].to(device)  # Get batch of images from our train dataloader
         target = batch[1].to(device)  # Get the corresponding target(0, 1 or 2) representing cats, dogs or pandas
 
