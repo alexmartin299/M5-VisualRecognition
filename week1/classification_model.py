@@ -3,7 +3,13 @@ import torch.nn.functional as F
 import torch
 from torchsummary import summary
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+torch.cuda.set_device(device)
+"""
+print('Using:', device)
+print(torch.cuda.is_available())
+print(torch.cuda.get_device_name(0))
+"""
 
 class MyModel(nn.Module):
     def __init__(self):

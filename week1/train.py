@@ -1,4 +1,6 @@
 import os
+from torch.utils.tensorboard import SummaryWriter
+from prompt_toolkit import print_formatted_text
 from classification_model import MyModel
 import torch
 import torch.nn as nn
@@ -9,13 +11,19 @@ from tqdm import tqdm
 
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+torch.cuda.set_device(device)
+"""
 print('Using:', device)
+print(torch.cuda.is_available())
+print(torch.cuda.get_device_name(0))
+"""
 
 
-epochs = 200
-BATCH_SIZE = 8
+epochs = 100
+BATCH_SIZE = 32
 lr = 1e-3
 
+"""
 wandb.init(project="M5-VisualRecognition", entity="m5-group6")
 
 wandb.config = {
@@ -24,6 +32,7 @@ wandb.config = {
   "batch_size": BATCH_SIZE,
   "architecture" : "CNN",
 }
+"""
 def get_dataloaders(BATCH_SIZE):
 
 
@@ -112,26 +121,36 @@ def Test(model, test_dataloader):
 
     return loss_metric_test, correct
 
-train_dataloader, test_dataloader = get_dataloaders(BATCH_SIZE)
-
-model = MyModel().to(device)
-
-optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-criterion = nn.CrossEntropyLoss()
-wandb.watch(model)
 
 
-for epoch in range(0, epochs):
-    print(f"Epoch {epoch + 1}\n-------------------------------")
-    train_loss, train_acc = Train(model,train_dataloader)
-    test_loss, test_acc = Test(model,test_dataloader)
 
-    wandb.log({"Train loss": train_loss,
-               "Train accuracy": train_acc,
-               "Valid loss": test_loss,
-               "Valid accuracy": test_acc, "epoch": epoch})
-    print('\n')
+if __name__ == '__main__':
+    train_dataloader, test_dataloader = get_dataloaders(BATCH_SIZE)
+    model = MyModel().to(device)
 
-    if epoch % 10 == 0:
-        torch.save(model, 'model_' + str(epoch) + '.pth')
+    
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    criterion = nn.CrossEntropyLoss()
+    """wandb.watch(model)"""
+    writer = SummaryWriter()
 
+
+    for epoch in range(0, epochs):
+        print(f"Epoch {epoch + 1}\n-------------------------------")
+        train_loss, train_acc = Train(model,train_dataloader)
+        test_loss, test_acc = Test(model,test_dataloader)
+        writer.add_scalars('Loss', {'Train Loss':train_loss,
+                                    'Test Loss': test_loss}, epoch)
+        writer.add_scalars('Accuracy', {'Train Accuracy': train_acc,
+                                    'Test Accuracy': test_acc}, epoch)
+
+        """
+        wandb.log({"Train loss": train_loss,
+                "Train accuracy": train_acc,
+                "Valid loss": test_loss,
+                "Valid accuracy": test_acc, "epoch": epoch})"""
+        print('\n')
+
+        if epoch % 10 == 0:
+            torch.save(model, 'model_' + str(epoch) + '.pth')
+    writer.close()
