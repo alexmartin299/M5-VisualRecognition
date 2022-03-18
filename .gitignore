@@ -129,3 +129,4 @@ dmypy.json
 .pyre/
 /wandb/
 /venv_m5/
+/KITTI-MOTS/
