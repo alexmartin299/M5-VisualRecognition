@@ -136,7 +136,7 @@ def get_dataset_dicts_detection(dataset_folder, train_or_val):
                     obj_dic = {
                         "bbox" : list(bbox),
                         "bbox_mode" : BoxMode.XYWH_ABS,
-                        "category_id" : category_id
+                        "category_id" : category_id-1
                     }
                     objs.append(obj_dic)
 
@@ -175,7 +175,7 @@ def get_dataset_dicts_segmentation(dataset_folder, train_or_val):
                     obj_dic = {
                         "bbox" : list(bbox),
                         "bbox_mode" : BoxMode.XYWH_ABS,
-                        "category_id" : category_id,
+                        "category_id" : category_id -1,
                         "segmentation" : mask
                     }
                     objs.append(obj_dic)

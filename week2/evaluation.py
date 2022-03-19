@@ -1,49 +1,100 @@
 from detectron2.utils.logger import setup_logger
 setup_logger()
 
-# import some common libraries
 import numpy as np
 import os, json, cv2, random
-
-# import some common detectron2 utilities
 from detectron2 import model_zoo
 from detectron2.engine import DefaultPredictor
+from detectron2.evaluation import COCOEvaluator, inference_on_dataset
+
 from detectron2.config import get_cfg
 from detectron2.utils.visualizer import Visualizer
-from detectron2.data import MetadataCatalog, DatasetCatalog
+from detectron2.data import MetadataCatalog, DatasetCatalog, build_detection_test_loader
 from dataloader import get_dataset_dicts_detection,get_dataset_dicts_segmentation
+from detectron2.utils.visualizer import ColorMode
 
 
-#first adapt the dataset and register it for each of the tasks
+#first adapt the validation dataset and register it for each of the tasks
 dataset_folder = '/home/alex/Desktop/university/M5VisualRecognition/M5-VisualRecognition/KITTI-MOTS'
-for d in ['training','validation']:
+for d in ['validation']:
     DatasetCatalog.register("kitti_mots_" + d + "_detection", lambda d=d: get_dataset_dicts_detection(dataset_folder, train_or_val=d))
-    MetadataCatalog.get("kitti_mots_" + d + "_detection").set(thing_classes=["cars,pedestrians"])
+    MetadataCatalog.get("kitti_mots_" + d + "_detection").set(thing_classes=["car","pedestrian"])
 
-for d in ['training','validation']:
+detection_metadata = MetadataCatalog.get("kitti_mots_validation_detection")
+
+for d in ['validation']:
     DatasetCatalog.register("kitti_mots_" + d + "_segmentation", lambda d=d: get_dataset_dicts_segmentation(dataset_folder, train_or_val=d))
-    MetadataCatalog.get("kitti_mots_" + d + "_segmentation").set(thing_classes=["cars,pedestrians"])
+    MetadataCatalog.get("kitti_mots_" + d + "_segmentation").set(thing_classes=["car","pedestrian"])
+
+segmentation_metadata = MetadataCatalog.get("kitti_mots_validation_segmentation")
+
+#setup cfg to perform inference and evaluation
+def setup_cfg(path_to_model):
+    cfg = get_cfg()
+    #inference with faster R-CNN
+    # add project-specific config (e.g., TensorMask) here if you're not running a model in detectron2's core library
+    cfg.merge_from_file(model_zoo.get_config_file(path_to_model))
+    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5  # set threshold for this model
+    cfg.MODEL.ROI_HEADS.NUM_CLASSES = 2
+    # Find a model from detectron2's model zoo. You can use the https://dl.fbaipublicfiles... url as well
+    cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(path_to_model)
+    cfg.INPUT.MASK_FORMAT = 'bitmask'
+    predictor = DefaultPredictor(cfg)
+
+    return cfg, predictor
+
+def plot_examples(dataset_dicts,predictor,metadata):
+
+    for d in random.sample(dataset_dicts, 3):
+        im = cv2.imread(d["file_name"])
+        outputs = predictor(
+            im)  # format is documented at https://detectron2.readthedocs.io/tutorials/models.html#model-output-format
+        v = Visualizer(im[:, :, ::-1],
+                       metadata=metadata,
+                       scale=1.2
+                       )
+        out = v.draw_instance_predictions(outputs["instances"].to("cpu"))
+        cv2.imshow('visualization',out.get_image()[:, :, ::-1])
+        cv2.waitKey(0)
 
 
 #code for visualizing if works fine TERMINATE WINDOWS WITH 0
-"""
-kittimots_metadata_detection = MetadataCatalog.get("kitti_mots_train_detection")
-dataset_dicts = get_dataset_dicts_detection(dataset_folder, train_or_val='training')
-for d in random.sample(dataset_dicts, 3):
+
+"""dataset_dicts = get_dataset_dicts_detection(dataset_folder, train_or_val='validation')
+for d in random.sample(dataset_dicts, 5):
     img = cv2.imread(d["file_name"])
-    visualizer = Visualizer(img[:, :, ::-1], metadata=kittimots_metadata_detection, scale=1.2)
+    visualizer = Visualizer(img[:, :, ::-1], metadata=detection_metadata, scale=1.2)
     out = visualizer.draw_dataset_dict(d)
     cv2.imshow('visualize',out.get_image()[:, :, ::-1])
-    cv2.waitKey(0)
-"""
+    cv2.waitKey(0)"""
 
-#have to use coco metrics for evaluation
+#Perform quantitative evaluation with COCO evaluator
+
+def coco_evaluator(cfg, predictor,register_name):
+
+    evaluator = COCOEvaluator(register_name, output_dir="./output")
+    val_loader = build_detection_test_loader(cfg, register_name)
+    print(inference_on_dataset(predictor.model, val_loader, evaluator))
 
 #load coco weights of models
 yaml_files = ["COCO-Detection/faster_rcnn_R_50_FPN_1x.yaml", "COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_1x.yaml"]
+metadatas = [detection_metadata,segmentation_metadata]
+dataset_functions = [get_dataset_dicts_detection, get_dataset_dicts_segmentation]
+register_names = ["kitti_mots_validation_detection","kitti_mots_validation_segmentation"]
 
-for i in yaml_files:
-    """hay que acabar de hacer el loop para evaluation"""
-    pass
+def qualitative_results():
+    for i,dataset_function,metadata in zip(yaml_files,dataset_functions,metadatas):
+        cfg, predictor = setup_cfg(i)
+        dataset_dict = dataset_function(dataset_folder, train_or_val='validation')
+        plot_examples(dataset_dict,predictor,metadata)
+
+
+for i,register_name,metadata in zip(yaml_files,register_names,metadatas):
+    cfg, predictor = setup_cfg(i)
+    evaluator = COCOEvaluator(register_name, output_dir="./output")
+    val_loader = build_detection_test_loader(cfg, register_name)
+    print(inference_on_dataset(predictor.model, val_loader, evaluator))
+
+
 
 
