@@ -1,94 +1,10 @@
 import os
 import numpy as np
-import pycocotools.mask as rletools
-import cv2
 from detectron2.structures import BoxMode
-import glob
 import PIL.Image as Image
+import cv2
 
-class SegmentedObject:
-  def __init__(self, mask, class_id, track_id):
-    self.mask = mask
-    self.class_id = class_id
-    self.track_id = track_id
-
-
-def filename_to_frame_nr(filename):
-    assert len(filename) == 10, "Expect filenames to have format 000000.png, 000001.png, ..."
-    return int(filename.split('.')[0])
-
-
-def load_image(filename, id_divisor=1000):
-    img = np.array(Image.open(filename))
-    obj_ids = np.unique(img)
-
-    objects = []
-    mask = np.zeros(img.shape, dtype=np.uint8, order="F")  # Fortran order needed for pycocos RLE tools
-    for idx, obj_id in enumerate(obj_ids):
-        if obj_id == 0:  # background
-            continue
-        mask.fill(0)
-        pixels_of_elem = np.where(img == obj_id)
-        mask[pixels_of_elem] = 1
-        objects.append(SegmentedObject(
-            rletools.encode(mask),
-            obj_id // id_divisor,
-            obj_id
-        ))
-
-    return objects
-
-def load_images_for_folder(path):
-  files = sorted(glob.glob(os.path.join(path, "*.png")))
-
-  objects_per_frame = {}
-  for file in files:
-    objects = load_image(file)
-    frame = filename_to_frame_nr(os.path.basename(file))
-    objects_per_frame[frame] = objects
-
-  return objects_per_frame
-
-def load_txt(path):
-
-  objects_per_frame = {}
-  track_ids_per_frame = {}  # To check that no frame contains two objects with same id
-  combined_mask_per_frame = {}  # To check that no frame contains overlapping masks
-  with open(path, "r") as f:
-    for line in f:
-      line = line.strip()
-      fields = line.split(" ")
-
-      frame = int(fields[0])
-      if frame not in objects_per_frame:
-        objects_per_frame[frame] = []
-      if frame not in track_ids_per_frame:
-        track_ids_per_frame[frame] = set()
-      if int(fields[1]) in track_ids_per_frame[frame]:
-        assert False, "Multiple objects with track id " + fields[1] + " in frame " + fields[0]
-      else:
-        track_ids_per_frame[frame].add(int(fields[1]))
-
-      class_id = int(fields[2])
-      if not(class_id == 1 or class_id == 2 or class_id == 10):
-        assert False, "Unknown object class " + fields[2]
-
-      mask = {'size': [int(fields[3]), int(fields[4])], 'counts': fields[5].encode(encoding='UTF-8')}
-      if frame not in combined_mask_per_frame:
-        combined_mask_per_frame[frame] = mask
-      elif rletools.area(rletools.merge([combined_mask_per_frame[frame], mask], intersect=True)) > 0.0:
-        assert False, "Objects with overlapping masks in frame " + fields[0]
-      else:
-        combined_mask_per_frame[frame] = rletools.merge([combined_mask_per_frame[frame], mask], intersect=False)
-      objects_per_frame[frame].append(SegmentedObject(
-        mask,
-        class_id,
-        int(fields[1])
-      ))
-
-  return objects_per_frame
-
-def get_files(dataset_folder, train_or_val = 'training'):
+def get_files_txt(dataset_folder, train_or_val = 'training'):
     """ Returns filenames where there are the folder of the sequences
     with the images and the text instances"""
     images_path = os.path.join(dataset_folder,train_or_val)
@@ -105,83 +21,111 @@ def get_files(dataset_folder, train_or_val = 'training'):
 
     return [(folder,txt) for folder,txt in zip(training_image_folders, training_instances_txts)]
 
+def get_files_instances(dataset_folder, train_or_val = 'training'):
+    """ Returns filenames where there are the folder of the sequences
+    with the images and the text instances"""
+    images_path = os.path.join(dataset_folder,train_or_val)
+    instances_path = os.path.join(dataset_folder,'instances_'+train_or_val)
+    training_image_paths = []
+    training_instances_path = []
 
-def get_dataset_dicts_detection(dataset_folder, train_or_val):
-    """ Returns dict to register for the case of detection
-      dataset_folder: folder where KITTI-MOTS is with specific structure
-      train_or_val: string with value 'training' or 'validation'"""
+    for folder in os.listdir(images_path):
+        training_image_paths.append(os.path.join(images_path,folder))
+        training_instances_path.append(os.path.join(instances_path,folder))
+
+    training_image_folders = sorted(training_image_paths)
+    training_instances_folders = sorted(training_instances_path)
+
+    return [(folder,txt) for folder,txt in zip(training_image_folders, training_instances_folders)]
+
+def read_annotations_detection(gt,map_classes):
+    patterns = list(np.unique(gt))[1:-1]
+
+    objs = []
+    for pattern in patterns:
+        coords = np.argwhere(gt==pattern)
+
+        x0, y0 = coords.min(axis=0)
+        x1, y1 = coords.max(axis=0)
+
+        bbox = [y0, x0, y1, x1]
+
+        obj = {
+            "bbox": bbox,
+            "bbox_mode":BoxMode.XYXY_ABS,
+            "category_id": map_classes[int(np.floor(gt[coords[0][0]][coords[0][1]]/1e3))],
+            "iscrowd": 0
+        }
+
+        objs.append(obj)
+
+    return objs
+
+def read_annotations_segmentation(gt,map_classes):
+    patterns = list(np.unique(gt))[1:-1]
+
+    objs = []
+    for pattern in patterns:
+        coords = np.argwhere(gt==pattern)
+
+        x0, y0 = coords.min(axis=0)
+        x1, y1 = coords.max(axis=0)
+
+        bbox = [y0, x0, y1, x1]
+
+        copy = gt.copy()
+        copy[gt==pattern] = 255
+        copy[gt!=pattern] = 0
+        copy = np.asarray(copy,np.uint8)
+
+        contours, _ = cv2.findContours(copy, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+
+        contour = [np.reshape(contour,(contour.shape[0],2)) for contour in contours]
+        contour = np.asarray([item for tree in contour for item in tree])
+        px = contour[:,0]
+        py = contour[:,1]
+        poly = [(x + 0.5, y + 0.5) for x, y in zip(px, py)]
+        poly = [p for x in poly for p in x]
+
+        if len(poly) < 6:
+            continue
+
+
+        obj = {
+            "bbox": bbox,
+            "bbox_mode":BoxMode.XYXY_ABS,
+            "segmentation": [poly],
+            "category_id": map_classes[int(np.floor(gt[coords[0][0]][coords[0][1]]/1e3))],
+            "iscrowd": 0
+        }
+
+        objs.append(obj)
+
+    return objs
+
+def load_dataset(dataset_folder,map_classes,train_or_val,type='detection'):
+
     dataset_dicts = []
-    for folder, txt in get_files(dataset_folder, train_or_val):
-        # get data folder and its corresponding txt file
-        # load the annotations for the folder
-        annotations = load_txt(txt)
-        image_paths = sorted(os.listdir(folder))
-        for (image_path, (file_id, objects)) in zip(image_paths, list(annotations.items())):
-            record = {}
+    for folder_img, folder_instance in get_files_instances(dataset_folder, train_or_val):
 
-            filename = os.path.join(folder, image_path)
-            height,width = cv2.imread(filename).shape[:2]
+        for img_name, instance_name in zip(os.listdir(folder_img),os.listdir(folder_instance)):
+
+            record = {}
+            filename = os.path.join(folder_img, img_name)
+            gt_filename = os.path.join(folder_instance,instance_name)
+
+            gt = np.asarray(Image.open(gt_filename))
+
+            height, width = gt.shape[:]
 
             record["file_name"] = filename
             record["image_id"] = filename
             record["height"] = height
             record["width"] = width
-
-            objs = []
-            for obj in objects:
-                if obj.track_id != 10000:
-                    category_id = obj.class_id
-                    bbox = rletools.toBbox(obj.mask)
-
-                    obj_dic = {
-                        "bbox" : list(bbox),
-                        "bbox_mode" : BoxMode.XYWH_ABS,
-                        "category_id" : category_id-1
-                    }
-                    objs.append(obj_dic)
-
-            record["annotations"] = objs
+            if type  =='detection':
+                record["annotations"] = read_annotations_detection(gt,map_classes)
+            elif type == 'segmentation':
+                record["annotations"] = read_annotations_segmentation(gt, map_classes)
             dataset_dicts.append(record)
+
     return dataset_dicts
-
-def get_dataset_dicts_segmentation(dataset_folder, train_or_val):
-    """ Returns dict to register for the case of segmentation
-    dataset_folder: folder where KITTI-MOTS is with specific structure
-    train_or_val: string with value 'training' or 'validation'"""
-    dataset_dicts = []
-    for folder, txt in get_files(dataset_folder, train_or_val):
-        # get data folder and its corresponding txt file
-        # load the annotations for the folder
-        annotations = load_txt(txt)
-        image_paths = sorted(os.listdir(folder))
-        for (image_path, (file_id, objects)) in zip(image_paths, list(annotations.items())):
-            record = {}
-
-            filename = os.path.join(folder, image_path)
-            height,width = cv2.imread(filename).shape[:2]
-
-            record["file_name"] = filename
-            record["image_id"] = filename
-            record["height"] = height
-            record["width"] = width
-
-            objs = []
-            for obj in objects:
-                if obj.track_id != 10000:
-                    category_id = obj.class_id
-                    bbox = rletools.toBbox(obj.mask)
-                    mask = obj.mask
-
-                    obj_dic = {
-                        "bbox" : list(bbox),
-                        "bbox_mode" : BoxMode.XYWH_ABS,
-                        "category_id" : category_id -1,
-                        "segmentation" : mask
-                    }
-                    objs.append(obj_dic)
-
-            record["annotations"] = objs
-            dataset_dicts.append(record)
-    return dataset_dicts
-
-
