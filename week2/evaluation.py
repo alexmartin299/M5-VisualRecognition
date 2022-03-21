@@ -72,9 +72,8 @@ map_classes = {1:2,2:0}
 dataset_folder = '/home/alex/Desktop/university/M5VisualRecognition/M5-VisualRecognition/KITTI-MOTS'
 
 #load coco weights of models
-#yaml_files = [ "COCO-InstanceSegmentation/faster_rcnn_R_50_FPN_1x.yaml","COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_1x.yaml"]
-yaml_files = [ "COCO-Detection/faster_rcnn_R_50_DC5_1x.yaml","COCO-InstanceSegmentation/mask_rcnn_R_50_DC5_1x.yaml"]
-#yaml_files = [ "COCO-Detection/faster_rcnn_R_50_DC5_3x.yaml","COCO-InstanceSegmentation/mask_rcnn_R_50_DC5_3x.yaml"]
+yaml_files = [ "COCO-InstanceSegmentation/faster_rcnn_R_50_FPN_1x.yaml","COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_1x.yaml"]
+
 types = [ 'detection', 'segmentation']
 
 for (round , i), type in zip(enumerate(yaml_files),types):
