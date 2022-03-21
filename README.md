@@ -11,7 +11,7 @@
  
  **Presentations**:  
    Week1:   https://docs.google.com/presentation/d/1DFNzOIEmj35EVuI-A0nPaJrHFI6k4Ut7Nl-Dig2nJ_s/edit?usp=sharing  
-   Week2:   https://docs.google.com/presentation/d/1IkfHFOOYdW-RRTSxSDPPofPKPrvhKaT3iLwrMFufelc/edit?usp=sharing
+   Week2:   https://docs.google.com/presentation/d/1IkfHFOOYdW-RRTSxSDPPofPKPrvhKaT3iLwrMFufelc/edit?usp=sharing   
    Week3:  
    Week4:  
    Week5:  
