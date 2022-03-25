@@ -11,6 +11,8 @@ from detectron2.utils.visualizer import Visualizer
 from detectron2.data import MetadataCatalog, DatasetCatalog, build_detection_test_loader
 from dataloader import load_dataset
 import os
+import torch
+
 
 def setup_cfg(path_to_model):
     cfg = get_cfg()
@@ -21,7 +23,7 @@ def setup_cfg(path_to_model):
     # Find a model from detectron2's model zoo. You can use the https://dl.fbaipublicfiles... url as well
     cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(path_to_model)
     results_dir = './output'
-    cfg.OUTPUT_DIR = results_dir + '/'
+    cfg.OUTPUT_DIR = results_dir
     predictor = DefaultPredictor(cfg)
 
     return cfg, predictor
@@ -69,38 +71,58 @@ map_classes = {1:0, 2:1}
 things_classes = ['Car', 'Pedestrian']
 # first adapt the validation dataset and register it for each of the tasks
 dataset_folder = '/home/alex/Desktop/university/M5VisualRecognition/M5-VisualRecognition/KITTI-MOTS'
-#load coco weights of models
-yaml_files = [ "COCO-Detection/faster_rcnn_R_50_FPN_1x.yaml","COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_1x.yaml"]
-types = [ 'detection', 'segmentation']
-methods = ['training','validation']
+#load coco weights of model
+yaml_file = "COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_1x.yaml"
+#Specify the type of work it is going to be performe detection or segmentation
+type = 'segmentation'
 
 
-for d ,type in zip(methods,types):
-    DatasetCatalog.register("kitti_mots_" + d + "_" + type,
-                            lambda d=d: load_dataset(dataset_folder, map_classes, train_or_val=d, type=type))
-    MetadataCatalog.get("kitti_mots_" + d + "_" + type).set(thing_classes=things_classes)
 
-for (round , i), type ,d in zip(enumerate(yaml_files),types,methods):
-    cfg, predictor = setup_cfg(i)
-    metadata = MetadataCatalog.get("kitti_mots_" + d + "_" + type)
-    cfg.DATASETS.TRAIN = ("kitti_mots_" + d +"_"+type,)
-    cfg.DATASETS.TEST = ("kitti_mots_" + d +"_"+type,)
-    cfg.DATALOADER.NUM_WORKERS = 2
-    cfg.MODEL.ROI_HEADS.NUM_CLASSES = len(things_classes)
-    cfg.SOLVER.IMS_PER_BATCH = 2
+DatasetCatalog.register("kitti_mots_training_" + type,
+                        lambda d='training': load_dataset(dataset_folder, map_classes, train_or_val=d, type=type))
+MetadataCatalog.get("kitti_mots_training_" + type).set(thing_classes=things_classes)
+metadata_train = MetadataCatalog.get("kitti_mots_training_" + type)
+DatasetCatalog.register("kitti_mots_validation_" + type,
+                        lambda d='validation': load_dataset(dataset_folder, map_classes, train_or_val=d, type=type))
+MetadataCatalog.get("kitti_mots_validation_" + type).set(thing_classes=things_classes)
+metadata_val = MetadataCatalog.get("kitti_mots_validation_" + type)
 
-    cfg.SOLVER.BASE_LR = 0.001
 
-    cfg.SOLVER.MAX_ITER = 1000
-    cfg.SOLVER.STEPS = []#no learning rate decay
-    cfg.MODEL.ROI_HEADS.BATCH_SIZE_PER_IMAGE = 8
-    cfg.TEST.EVAL_PERIOD = 0
-    cfg.MODEL.BACKBONE.FREEZE_AT = 2
+#Setup config of trainer
+cfg = get_cfg()
+cfg.merge_from_file(model_zoo.get_config_file(yaml_file))
+cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5  # set threshold for this model
+# Find a model from detectron2's model zoo. You can use the https://dl.fbaipublicfiles... url as well
+cfg.MODEL.WEIGHTS = model_zoo.get_checkpoint_url(yaml_file)
 
-    trainer = DefaultTrainer(cfg)
-    trainer.resume_or_load(resume=True)
-    trainer.train()
-    trainer.test()
+results_dir = '/home/alex/Desktop/university/M5VisualRecognition/M5-VisualRecognition/week2/output'
+cfg.OUTPUT_DIR = results_dir
+cfg.DATASETS.TRAIN = ("kitti_mots_training_" + type,)
+cfg.DATASETS.TEST = ("kitti_mots_validation_" + type,)
+cfg.DATALOADER.NUM_WORKERS = 2
+cfg.MODEL.ROI_HEADS.NUM_CLASSES = len(things_classes)
+cfg.SOLVER.IMS_PER_BATCH = 1
+
+cfg.SOLVER.BASE_LR = 0.0001
+cfg.SOLVER.MAX_ITER = 2000
+cfg.MODEL.ROI_HEADS.BATCH_SIZE_PER_IMAGE = 64
+cfg.MODEL.DEVICE = "cuda"
+cfg.INPUT.MASK_FORMAT = 'bitmask'
+
+trainer = DefaultTrainer(cfg)
+trainer.resume_or_load(resume=False)
+trainer.train()
+
+torch.save(trainer.model.state_dict(), os.path.join(cfg.OUTPUT_DIR, "model_final.pth"))
+
+cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "model_final.pth")  # path to the model we just trained
+cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.5  # set the testing threshold for this model
+
+predictor = DefaultPredictor(cfg)
+
+evaluator = COCOEvaluator("kitti_mots_validation_" + type, output_dir=cfg.OUTPUT_DIR)
+val_loader = build_detection_test_loader(cfg, "kitti_mots_validation_" + type)
+print(inference_on_dataset(predictor.model, val_loader, evaluator))
 
 
 
