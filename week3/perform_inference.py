@@ -10,8 +10,8 @@ from detectron2.utils.visualizer import Visualizer
 from detectron2.data import MetadataCatalog
 
 model = "COCO-Detection/faster_rcnn_R_50_FPN_1x.yaml"
-images_path = '/home/alex/Desktop/university/M5VisualRecognition/M5-VisualRecognition/week3/out_of_context'
-out_path = '/home/alex/Desktop/university/M5VisualRecognition/M5-VisualRecognition/week3/out_of_context_out'
+images_path = '/home/alex/Desktop/university/M5VisualRecognition/M5-VisualRecognition/week3/original images'
+out_path = '/home/alex/Desktop/university/M5VisualRecognition/M5-VisualRecognition/week3/originals_output'
 
 # CONFIGURATION
 # Model config
