@@ -118,7 +118,7 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs):
     # Load Best Stats
     model.load_state_dict(best_model_wts)
     # Save
-    torch.save(model.state_dict(), "fine_tuned_resnet50.pt")
+    torch.save(model.state_dict(), "./models/fine_tuned_resnet50.pt")
     return model, val_acc_history
 
 
@@ -135,18 +135,34 @@ def extract_features(model, x, phase):
         return outputs
 
 
-if not os.path.exists("./fine_tuned_resnet50.pt"):
+if not os.path.exists("./models/fine_tuned_resnet50.pt"):
     best_model, _ = train_model(model=model, dataloaders = dataloaders, criterion = LOSS, optimizer = OPT, num_epochs=EPOCHS)
 else:
     best_model = copy.deepcopy(model)
-    best_model.load_state_dict(torch.load("fine_tuned_resnet50.pt"))
-    
+    best_model.load_state_dict(torch.load("./models/fine_tuned_resnet50.pt"))
 best_model.eval()
+
+
+# Load Dataset
+transform = transforms.Compose([
+    transforms.Resize(224),
+    transforms.ToTensor(),
+    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+])
+
+train_dataset = torchvision.datasets.ImageFolder(os.path.join(DATASET,'train'), transform=transform)
+test_dataset = torchvision.datasets.ImageFolder(os.path.join(DATASET,'test'), transform=transform)
+# RESET LOADERS WITHOUT SHUFFLE
+train_dataloader = torch.utils.data.DataLoader(dataset = train_dataset, batch_size = BATCH_SIZE, shuffle = False, num_workers = 2)
+test_dataloader = torch.utils.data.DataLoader(dataset = test_dataset, batch_size = BATCH_SIZE, shuffle = False, num_workers = 2)
+dataloaders = {"train": train_dataloader, "test": test_dataloader}
+
+
 train_features = extract_features(best_model,dataloaders,"train")
 test_features = extract_features(best_model,dataloaders,"test")
 
-pkl.dump(train_features, open("train_features_resnet50.pkl", "wb"))
-pkl.dump(test_features, open("test_features_resnet50.pkl","wb"))
+pkl.dump(train_features, open("./features/train_features_resnet50.pkl", "wb"))
+pkl.dump(test_features, open("./features/test_features_resnet50.pkl","wb"))
 
 
 
