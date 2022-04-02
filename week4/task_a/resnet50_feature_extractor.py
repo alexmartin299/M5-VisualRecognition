@@ -18,7 +18,7 @@ torch.cuda.set_device(device)
 
 
 # Define Parameters
-DATASET = '../MIT_split'
+DATASET = '../../MIT_split'
 BATCH_SIZE = 8
 NUM_CLASS = 8
 EPOCHS = 5
@@ -118,7 +118,7 @@ def train_model(model, dataloaders, criterion, optimizer, num_epochs):
     # Load Best Stats
     model.load_state_dict(best_model_wts)
     # Save
-    torch.save(model.state_dict(), "./models/fine_tuned_resnet50.pt")
+    torch.save(model.state_dict(), "../models/fine_tuned_resnet50.pt")
     return model, val_acc_history
 
 
@@ -135,11 +135,11 @@ def extract_features(model, x, phase):
         return outputs
 
 
-if not os.path.exists("./models/fine_tuned_resnet50.pt"):
+if not os.path.exists("../models/fine_tuned_resnet50.pt"):
     best_model, _ = train_model(model=model, dataloaders = dataloaders, criterion = LOSS, optimizer = OPT, num_epochs=EPOCHS)
 else:
     best_model = copy.deepcopy(model)
-    best_model.load_state_dict(torch.load("./models/fine_tuned_resnet50.pt"))
+    best_model.load_state_dict(torch.load("../models/fine_tuned_resnet50.pt"))
 best_model.eval()
 
 
@@ -161,8 +161,8 @@ dataloaders = {"train": train_dataloader, "test": test_dataloader}
 train_features = extract_features(best_model,dataloaders,"train")
 test_features = extract_features(best_model,dataloaders,"test")
 
-pkl.dump(train_features, open("./features/train_features_resnet50.pkl", "wb"))
-pkl.dump(test_features, open("./features/test_features_resnet50.pkl","wb"))
+pkl.dump(train_features, open("../features/train_features_resnet50.pkl", "wb"))
+pkl.dump(test_features, open("../features/test_features_resnet50.pkl","wb"))
 
 
 
