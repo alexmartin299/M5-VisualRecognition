@@ -16,7 +16,7 @@ BATCH_SIZE = 8
 DATASET = '../MIT_split'
 #load data and transform to siamese format
 transform = transforms.Compose([
-    transforms.Resize(256),
+    transforms.Resize((100, 100)),
     transforms.ToTensor(),
     transforms.Normalize([0.5], [0.5])
 ])

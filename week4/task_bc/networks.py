@@ -13,7 +13,7 @@ class EmbeddingNet(nn.Module):
                                 nn.Linear(256, 256),
                                 nn.PReLU(),
                                 nn.Linear(256, 2)
-                                )
+                            )
 
     def forward(self, x):
         output = self.convnet(x)
