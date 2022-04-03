@@ -41,154 +41,36 @@ class SiameseNetworkDataset(Dataset):
     def __len__(self):
         return len(self.imageFolderDataset.imgs)
 
+class TripletMIT_split(Dataset):
 
-class TripletMNIST(Dataset):
-    """From the MNIST Dataset it generates triplet samples
-    note: a triplet is composed by a pair of matching images and one of
-    different class.
-    """
-    def __init__(self,n_triplets, *arg, **kw):
-        super(TripletMNIST, self).__init__(*arg, **kw)
-
-        print('Generating triplets ...')
-        self.n_triplets = n_triplets
-        self.train_triplets = self.generate_triplets(self.train_labels)
-
-    def generate_triplets(self, labels):
-        triplets = []
-        for x in xrange(self.n_triplets):
-            idx = np.random.randint(0, labels.size(0))
-            idx_matches = np.where(labels.numpy() == labels[idx])[0]
-            idx_no_matches = np.where(labels.numpy() != labels[idx])[0]
-            idx_a, idx_p = np.random.choice(idx_matches, 2, replace=False)
-            idx_n = np.random.choice(idx_no_matches, 1)[0]
-            triplets.append([idx_a, idx_p, idx_n])
-        return np.array(triplets)
-
-    def __getitem__(self, index):
-        if self.train:
-            t = self.train_triplets[index]
-            a, p, n = self.train_data[t[0]], self.train_data[t[1]],\
-                      self.train_data[t[2]]
-
-        # doing this so that it is consistent with all other datasets
-        # to return a PIL Image
-        img_a = Image.fromarray(a.numpy(), mode='L')
-        img_p = Image.fromarray(p.numpy(), mode='L')
-        img_n = Image.fromarray(n.numpy(), mode='L')
-
-        if self.transform is not None:
-            img_a = self.transform(img_a)
-            img_p = self.transform(img_p)
-            img_n = self.transform(img_n)
-
-        return img_a, img_p, img_n
-
-
-class SiameseMNIST(Dataset):
-    """
-    Train: For each sample creates randomly a positive or a negative pair
-    Test: Creates fixed pairs for testing
-    """
-
-    def __init__(self, mnist_dataset):
-        self.mnist_dataset = mnist_dataset
-
-        self.train = self.mnist_dataset.train
-        self.transform = self.mnist_dataset.transform
+    def __init__(self, mit_split_dataset, split, transform=None):
+        self.dataset = mit_split_dataset
+        self.n_samples = len(self.dataset)
+        self.train = split == 'train'
+        self.transform = transform
 
         if self.train:
-            self.train_labels = self.mnist_dataset.train_labels
-            self.train_data = self.mnist_dataset.train_data
-            self.labels_set = set(self.train_labels.numpy())
-            self.label_to_indices = {label: np.where(self.train_labels.numpy() == label)[0]
-                                     for label in self.labels_set}
-        else:
-            # generate fixed pairs for testing
-            self.test_labels = self.mnist_dataset.test_labels
-            self.test_data = self.mnist_dataset.test_data
-            self.labels_set = set(self.test_labels.numpy())
-            self.label_to_indices = {label: np.where(self.test_labels.numpy() == label)[0]
-                                     for label in self.labels_set}
-
-            random_state = np.random.RandomState(29)
-
-            positive_pairs = [[i,
-                               random_state.choice(self.label_to_indices[self.test_labels[i].item()]),
-                               1]
-                              for i in range(0, len(self.test_data), 2)]
-
-            negative_pairs = [[i,
-                               random_state.choice(self.label_to_indices[
-                                                       np.random.choice(
-                                                           list(self.labels_set - set([self.test_labels[i].item()]))
-                                                       )
-                                                   ]),
-                               0]
-                              for i in range(1, len(self.test_data), 2)]
-            self.test_pairs = positive_pairs + negative_pairs
-
-    def __getitem__(self, index):
-        if self.train:
-            target = np.random.randint(0, 2)
-            img1, label1 = self.train_data[index], self.train_labels[index].item()
-            if target == 1:
-                siamese_index = index
-                while siamese_index == index:
-                    siamese_index = np.random.choice(self.label_to_indices[label1])
-            else:
-                siamese_label = np.random.choice(list(self.labels_set - set([label1])))
-                siamese_index = np.random.choice(self.label_to_indices[siamese_label])
-            img2 = self.train_data[siamese_index]
-        else:
-            img1 = self.test_data[self.test_pairs[index][0]]
-            img2 = self.test_data[self.test_pairs[index][1]]
-            target = self.test_pairs[index][2]
-
-        img1 = Image.fromarray(img1.numpy(), mode='L')
-        img2 = Image.fromarray(img2.numpy(), mode='L')
-        if self.transform is not None:
-            img1 = self.transform(img1)
-            img2 = self.transform(img2)
-        return (img1, img2), target
-
-    def __len__(self):
-        return len(self.mnist_dataset)
-
-
-class TripletMNIST(Dataset):
-    """
-    Train: For each sample (anchor) randomly chooses a positive and negative samples
-    Test: Creates fixed triplets for testing
-    """
-
-    def __init__(self, mnist_dataset):
-        self.mnist_dataset = mnist_dataset
-        self.train = self.mnist_dataset.train
-        self.transform = self.mnist_dataset.transform
-
-        if self.train:
-            self.train_labels = self.mnist_dataset.train_labels
-            self.train_data = self.mnist_dataset.train_data
-            self.labels_set = set(self.train_labels.numpy())
-            self.label_to_indices = {label: np.where(self.train_labels.numpy() == label)[0]
+            self.train_labels = self.dataset.targets
+            self.train_data = self.dataset.samples
+            self.labels_set = set(self.train_labels)
+            self.label_to_indices = {label: np.where(np.asarray(self.train_labels) == label)[0]
                                      for label in self.labels_set}
 
         else:
-            self.test_labels = self.mnist_dataset.test_labels
-            self.test_data = self.mnist_dataset.test_data
+            self.test_labels = self.dataset.targets
+            self.test_data = self.dataset.samples
             # generate fixed triplets for testing
-            self.labels_set = set(self.test_labels.numpy())
-            self.label_to_indices = {label: np.where(self.test_labels.numpy() == label)[0]
+            self.labels_set = set(self.test_labels)
+            self.label_to_indices = {label: np.where(np.asarray(self.test_labels)  == label)[0]
                                      for label in self.labels_set}
 
             random_state = np.random.RandomState(29)
 
             triplets = [[i,
-                         random_state.choice(self.label_to_indices[self.test_labels[i].item()]),
+                         random_state.choice(self.label_to_indices[self.test_labels[i]]),
                          random_state.choice(self.label_to_indices[
                                                  np.random.choice(
-                                                     list(self.labels_set - set([self.test_labels[i].item()]))
+                                                     list(self.labels_set - {self.test_labels[i]})
                                                  )
                                              ])
                          ]
@@ -197,11 +79,11 @@ class TripletMNIST(Dataset):
 
     def __getitem__(self, index):
         if self.train:
-            img1, label1 = self.train_data[index], self.train_labels[index].item()
+            img1, label1 = self.train_data[index], self.train_labels[index]
             positive_index = index
             while positive_index == index:
                 positive_index = np.random.choice(self.label_to_indices[label1])
-            negative_label = np.random.choice(list(self.labels_set - set([label1])))
+            negative_label = np.random.choice(list(self.labels_set - {label1}))
             negative_index = np.random.choice(self.label_to_indices[negative_label])
             img2 = self.train_data[positive_index]
             img3 = self.train_data[negative_index]
@@ -210,9 +92,10 @@ class TripletMNIST(Dataset):
             img2 = self.test_data[self.test_triplets[index][1]]
             img3 = self.test_data[self.test_triplets[index][2]]
 
-        img1 = Image.fromarray(img1.numpy(), mode='L')
-        img2 = Image.fromarray(img2.numpy(), mode='L')
-        img3 = Image.fromarray(img3.numpy(), mode='L')
+        img1 = Image.open(img1[0])
+        img2 = Image.open(img2[0])
+        img3 = Image.open(img3[0])
+
         if self.transform is not None:
             img1 = self.transform(img1)
             img2 = self.transform(img2)
@@ -220,4 +103,5 @@ class TripletMNIST(Dataset):
         return (img1, img2, img3), []
 
     def __len__(self):
-        return len(self.mnist_dataset)
+        return self.n_samples # if you want to subsample for speed
+
