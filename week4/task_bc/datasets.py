@@ -28,9 +28,6 @@ class SiameseNetworkDataset(Dataset):
         img0 = Image.open(img0_tuple[0])
         img1 = Image.open(img1_tuple[0])
 
-        img0 = img0.convert('L')
-        img1 = img1.convert('L')
-
         if self.should_invert:
             img0 = PIL.ImageOps.invert(img0)
             img1 = PIL.ImageOps.invert(img1)
@@ -43,6 +40,50 @@ class SiameseNetworkDataset(Dataset):
 
     def __len__(self):
         return len(self.imageFolderDataset.imgs)
+
+
+class TripletMNIST(Dataset):
+    """From the MNIST Dataset it generates triplet samples
+    note: a triplet is composed by a pair of matching images and one of
+    different class.
+    """
+    def __init__(self,n_triplets, *arg, **kw):
+        super(TripletMNIST, self).__init__(*arg, **kw)
+
+        print('Generating triplets ...')
+        self.n_triplets = n_triplets
+        self.train_triplets = self.generate_triplets(self.train_labels)
+
+    def generate_triplets(self, labels):
+        triplets = []
+        for x in xrange(self.n_triplets):
+            idx = np.random.randint(0, labels.size(0))
+            idx_matches = np.where(labels.numpy() == labels[idx])[0]
+            idx_no_matches = np.where(labels.numpy() != labels[idx])[0]
+            idx_a, idx_p = np.random.choice(idx_matches, 2, replace=False)
+            idx_n = np.random.choice(idx_no_matches, 1)[0]
+            triplets.append([idx_a, idx_p, idx_n])
+        return np.array(triplets)
+
+    def __getitem__(self, index):
+        if self.train:
+            t = self.train_triplets[index]
+            a, p, n = self.train_data[t[0]], self.train_data[t[1]],\
+                      self.train_data[t[2]]
+
+        # doing this so that it is consistent with all other datasets
+        # to return a PIL Image
+        img_a = Image.fromarray(a.numpy(), mode='L')
+        img_p = Image.fromarray(p.numpy(), mode='L')
+        img_n = Image.fromarray(n.numpy(), mode='L')
+
+        if self.transform is not None:
+            img_a = self.transform(img_a)
+            img_p = self.transform(img_p)
+            img_n = self.transform(img_n)
+
+        return img_a, img_p, img_n
+
 
 class SiameseMNIST(Dataset):
     """
