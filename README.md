@@ -17,7 +17,7 @@
 
    * Week3: [Object Detection, Recognition and Segmentation II](https://docs.google.com/presentation/d/1JKPR9u4GHKFJJ6L-P7obSvy6TpCG93wuMbbT72nPZYo/edit?usp=sharing)
 
-   * Week4: [Image Retrieval]()
+   * Week4: [Image Retrieval](https://docs.google.com/presentation/d/1qYaMRr1_H4cbhd6Y3Qa8BU5_2nT8crH4qRKWwLhuL6E/edit?usp=sharing)
 
    * Week5:
 
