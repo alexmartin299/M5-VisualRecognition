@@ -6,9 +6,6 @@ from PIL import Image
 
 from torch.utils.data import Dataset
 
-
-# TODO: HABRA QUE MIRARLO BIEN PARA LA TASK C)
-
 # adapted from:
 # https://pytorch.org/vision/stable/_modules/torchvision/datasets/flickr.html#Flickr30k
 class Flickr30k(Dataset):

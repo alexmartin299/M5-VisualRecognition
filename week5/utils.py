@@ -1,11 +1,25 @@
 import numpy as np
-from sklearn.decomposition import PCA
-from scipy.spatial.distance import euclidean
+from sklearn.decomposition import PCA, FastICA
+from sklearn.preprocessing import normalize
+from scipy.spatial.distance import euclidean, chebyshev, minkowski
 
-def compute_distance(anchor, positive, negative, metric='euclidean'):
+def compute_similiarity(anchor, positive, negative, metric='euclidean'):
 
     if metric=='euclidean':
         return euclidean(anchor,positive), euclidean(anchor,negative)
+    elif metric=='chebyshev':
+        return chebyshev(anchor,positive), chebyshev(anchor,negative)
+    elif metric=='minkowski':
+        return minkowski(anchor,positive), minkowski(anchor,negative)
+    elif metric=='dot_product':
+        return np.dot(anchor,positive), np.dot(anchor, negative)
+    else:
+        print('Non-valid metric')
+
+def predicted_label(anch2pos_sim, anch2neg_sim, mode):
+    if mode in ['euclidean','chebyshev','minkowski','dot-product']:
+        return int(anch2pos_sim<anch2neg_sim)
+
 
 def select_img_from_feats(features_img, idx_img=None):
     """
@@ -47,20 +61,46 @@ def select_text_from_feats(features_text, idx_img=None, idx_text=None):
 
 def aggregate_text_features(positive_caption, negative_caption, mode):
     """
-    Projects the anchor and the positive and negative caption to the same dimension using PCA.
+    Aggregates the positive and negative caption.
     :param anchor: The anchor image.
     :param positive_caption: The positive caption.
     :param negative_caption: The negative caption.
+    :param mode: method for aggregating the text embedding
     :return: The projected anchor and the positive and negative caption.
     """
     if mode == 'mean':
-        return np.mean(positive_caption,axis=0), np.mean(negative_caption,axis=0)
+        norm_positive = normalize(np.mean(positive_caption, axis=0)[np.newaxis,:], axis=1)
+        norm_negative = normalize(np.mean(negative_caption, axis=0)[np.newaxis,:], axis=1)
+        return np.squeeze(norm_positive), np.squeeze(norm_negative)
+    if mode == 'sum':
+        norm_positive = normalize(np.sum(positive_caption,axis=0)[np.newaxis,:], axis=1)
+        norm_negative = normalize(np.sum(negative_caption,axis=0)[np.newaxis,:], axis=1)
+        return np.squeeze(norm_positive), np.squeeze(norm_negative)
+    if mode == 'PCA':
+        """Applies PCA"""
+        norm_positive = normalize(np.transpose(positive_caption), axis=1)
+        norm_negative = normalize(np.transpose(negative_caption), axis=1)
+        pca = PCA(n_components=1)
+        return pca.fit_transform(norm_positive), pca.fit_transform(norm_negative)
+    if mode == 'ICA':
+        """Applies ICA"""
+        norm_positive = normalize(np.transpose(positive_caption), axis=1)
+        norm_negative = normalize(np.transpose(negative_caption), axis=1)
+        ica = FastICA(n_components=1)
+        return ica.fit_transform(norm_positive), ica.fit_transform(norm_negative)
 
-
-def reduce_features_img(features_img):
-    pca = PCA(n_components=300)
-    return pca.fit_transform(features_img)
-
+def reduce_features_img(features_img, method='PCA'):
+    """
+    :param features_img:
+    :return: vectors reduced to 300 features
+    """
+    norm_features = normalize(features_img, axis=1)
+    if method == 'PCA':
+        pca = PCA(n_components=300)
+        return pca.fit_transform(norm_features)
+    if method == 'ICA':
+        ica = FastICA(n_components=300)
+        return ica.fit_transform(norm_features)
 
 def generate_negative_idx(range, exception_idx):
     """
