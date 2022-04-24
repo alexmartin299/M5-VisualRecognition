@@ -19,7 +19,5 @@
 
    * Week4: [Image Retrieval](https://docs.google.com/presentation/d/1qYaMRr1_H4cbhd6Y3Qa8BU5_2nT8crH4qRKWwLhuL6E/edit?usp=sharing)
 
-   * Week5:
-
-   * Week6:  
+   * Week5: [Cross-modal Retrival and final presentation](https://docs.google.com/presentation/d/1IDncInxaM2JSpZQ9uJ3T9ZK-kp0FxkZReRo9yvqz67Y/edit?usp=sharing)    
  
